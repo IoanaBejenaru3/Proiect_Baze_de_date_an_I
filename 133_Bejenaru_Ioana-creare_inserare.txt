@@ -1,0 +1,526 @@
+--ÎNCEPEM PRIN A CREA TABELELE DIN DIGRAMA CONCEPTUALA
+--constraint-urile ne ajuta in gestionarea erorilor
+--daca voi incerca sa inserez anumite lucruri care incalca constrainturile
+--voi primi mejsaj de eroare cu acel constraint si ma ajuta sa imi dau seama ce am gresit
+
+--DEPARTAMENTE
+create table departamente(
+    cod_departament number(3) constraint pk_cod_departament primary key, --are implicit NOT NULL
+    denumire varchar(15) constraint n_denumire not null unique,
+    ore_pe_luna number(3) constraint n_ore_pe_luna not null);
+--ORASE
+create table orase(
+    cod_oras number(4) constraint pk_cod_oras primary key,
+    denumire varchar(15) constraint n_denumire_orase not null unique,
+    populatie number(12) constraint n_populatie not null);
+
+--HOTELURI
+create table hoteluri(
+    cod_hotel number(4) constraint pk_cod_hotel primary key,
+    cod_oras number(4) constraint n_cod_oras not null,
+    denumire varchar(15) constraint n_denumire_hoteluri not null,
+    numar_stele number(2) constraint n_numar_stele not null,
+    numar_etaje number(2) constraint n_numar_etaje not null,
+    tarif number(5,3) constraint n_tarif not null,
+    constraint fk_oras 
+        foreign key(cod_oras) 
+        references orase(cod_oras) on delete cascade);
+
+--TIPURI_CAMERA
+create table tipuri_camera(
+    cod_tip_camera number(2) constraint pk_cod_tip_camera primary key,
+    denumire varchar(15) constraint n_denumire_tipuri_camera not null,
+    pret_noapte number(4) constraint n_pret_noapte not null,
+    capacitate number(2) constraint n_capacitate not null);
+
+--FACILITATI
+create table facilitati(
+    cod_facilitate number(4) constraint pk_cod_facilitate primary key,
+    pret_constructie number(10) constraint n_pret_constructie not null,
+    denumire varchar(15) constraint n_denumire_facilitati not null);
+
+--ABONAMENTE
+create table abonamente(
+    cod_abonament number(3) constraint pk_cod_abonament primary key,
+    pret_pe_zi number(4) constraint n_pret_pe_zi not null,
+    denumire varchar(15) constraint n_denumire_abonamente not null unique);
+
+--FACILITATI_HOTELURI
+create table facilitati_hoteluri(
+--daca un hotel intra in faliment sau este vandut dispar automat si facilitatile acestuia
+    cod_hotel number(4) constraint fk_cod_hotel 
+        references hoteluri(cod_hotel) on delete cascade,
+    cod_facilitate number(4),
+    numar_locuri number(6) constraint n_numar_locuri not null,
+    ora_deschidere varchar(6) constraint n_ora_deschidere not null,
+    ora_inchidere varchar(6) constraint n_ora_inchidere not null,
+    constraint fk_cod_facilitate
+        foreign key (cod_facilitate)
+        references facilitati(cod_facilitate), 
+    constraint pk_facilitati_hoteluri primary key(cod_hotel, cod_facilitate));
+
+--FACILITATI_ABONAMENTE
+create table facilitati_abonamente(
+    cod_facilitate number(4)constraint fk_cod_facilitate_fa
+        references facilitati(cod_facilitate),
+--daca un abonament este scos de antreprenor din cadrul hotelurilor acestuia
+--atunci si liniile aferente din tabela facilitati_abonamente trebuie sterse
+    cod_abonament number(3) constraint fk_cod_abonament_fa
+        references abonamente(cod_abonament) on delete cascade,
+    numar_intrari_zi number(3) constraint n_numar_intrari_zi not null,
+    constraint pk_facilitati_abonamente
+        primary key(cod_facilitate, cod_abonament));
+
+--ANGAJATI
+create table angajati(
+    cod_angajat number(5) constraint pk_cod_angajat primary key,
+    cod_departament number(3) constraint n_cod_departament not null,
+    cod_hotel number(4) constraint n_cod_hotel not null,
+    nume varchar(15) constraint n_nume not null,
+    prenume varchar(20) constraint n_prenume not null,
+    salariu number(7) constraint n_salariu not null,
+    data_angajare date constraint n_data_angajare not null,
+    constraint fk_departament
+        foreign key (cod_departament)
+        references departamente(cod_departament) on delete cascade,
+    constraint fk_hotel
+        foreign key (cod_hotel)
+        references hoteluri(cod_hotel) on delete cascade);
+
+--CAMERE
+create table camere(
+    cod_camera number(4),
+    cod_hotel number(4),
+    cod_tip_camera number(2) constraint n_cod_tip_camera not null,
+    etaj number(2) constraint n_etaj not null,
+    constraint fk_cod_tip_camera
+        foreign key (cod_tip_camera)
+        references tipuri_camera(cod_tip_camera),
+--daca se intampla ceva cu un hotel, se intampla automat si cu camerele acestuia
+    constraint fk_cod_hotel_camere
+        foreign key (cod_hotel)
+        references hoteluri(cod_hotel) on delete cascade,
+    constraint pk_camere
+        primary key(cod_camera, cod_hotel));
+
+--CLIENTI
+create table clienti(
+    cod_client number(15) constraint pk_cod_client primary key,
+    cod_abonament number(3) constraint n_cod_abonament not null,
+    nume varchar(15) constraint n_nume_clienti not null,
+    prenume varchar(20) constraint n_prenume_clienti not null,   
+    data_nastere date constraint n_data_nastere not null,
+    numar_telefon varchar(12) constraint n_numar_telefon not null unique,
+    constraint fk_cod_abonament
+        foreign key (cod_abonament)
+        references abonamente(cod_abonament) on delete set null);
+--daca scoatem un tip de abonament nu stergem si clientul
+
+--TRANZACTII
+create table tranzactii(
+    cod_tranzactie number(15) constraint pk_cod_tranzactie primary key,
+    tip_tranzactie varchar(5) constraint n_tip_tranzactie not null,
+    banca varchar(15),
+    suma number(10) constraint n_suma not null);
+        
+--REZERVARI
+create table rezervari(
+    cod_camera number(4),
+    cod_hotel number(4),
+    cod_client number(15),
+    cod_tranzactie number(15),
+    data_venire date,
+    data_plecare date,
+    constraint fk_cod_client
+        foreign key(cod_client)
+        references clienti(cod_client) on delete cascade,
+    constraint fk_camere
+        foreign key (cod_camera, cod_hotel)
+        references camere(cod_camera, cod_hotel) on delete cascade,
+    constraint fk_cod_tranzactie
+        foreign key (cod_tranzactie)
+        references tranzactii(cod_tranzactie) on delete cascade,
+    constraint pk_rezervari
+        primary key(cod_camera, cod_hotel, cod_client, cod_tranzactie, data_venire),
+    unique (cod_camera, cod_hotel, data_venire));
+
+
+--SECVENTE PENTRU INREGISTRARILE TABELELOR
+create sequence ct_cod_departament
+start with 1
+increment by 1
+minvalue 1
+maxvalue 999
+nocycle
+nocache;
+
+create sequence ct_cod_oras
+start with 1
+increment by 1
+minvalue 1
+maxvalue 9999
+nocycle
+nocache;
+
+create sequence ct_cod_hotel
+start with 1
+increment by 1
+minvalue 1
+maxvalue 9999
+nocycle
+nocache;
+
+create sequence ct_cod_angajat
+start with 1
+increment by 1
+minvalue 1
+maxvalue 99999
+nocycle
+nocache;
+
+create sequence ct_cod_facilitate
+start with 1
+increment by 1
+minvalue 1
+maxvalue 9999
+nocycle
+nocache;
+
+create sequence ct_cod_tip_camera
+start with 1
+increment by 1
+minvalue 1
+maxvalue 99
+nocycle
+nocache;
+
+create sequence ct_cod_client
+start with 1
+increment by 1
+minvalue 1
+maxvalue 999999999999999
+nocycle
+nocache;
+
+create sequence ct_cod_tranzactie
+start with 1
+increment by 1
+minvalue 1
+maxvalue 999999999999999
+nocycle
+nocache;
+
+
+create sequence ct_cod_camera_hotel_1
+start with 1
+increment by 1
+minvalue 1
+maxvalue 9999
+nocycle
+nocache;
+
+create sequence ct_cod_camera_hotel_2
+start with 1
+increment by 1
+minvalue 1
+maxvalue 9999
+nocycle
+nocache;
+
+create sequence ct_cod_camera_hotel_3
+start with 1
+increment by 1
+minvalue 1
+maxvalue 9999
+nocycle
+nocache;
+
+create sequence ct_cod_camera_hotel_4
+start with 1
+increment by 1
+minvalue 1
+maxvalue 9999
+nocycle
+nocache;
+
+--aici doar am inlocuit numarul de la ct_cod_camera_hotel_nr
+
+create sequence ct_cod_camera_hotel_15
+start with 1
+increment by 1
+minvalue 1
+maxvalue 9999
+nocycle
+nocache;
+
+
+--INSERAREA INREGISTRARILOR
+
+--DEPARTAMENTE
+insert into departamente values(ct_cod_departament.nextval,'RECEPTIE',160);
+insert into departamente values(ct_cod_departament.nextval,'CURATENIE',160);
+insert into departamente values(ct_cod_departament.nextval,'MARKETING',120);
+insert into departamente values(ct_cod_departament.nextval,'CONTABILITATE',160);
+insert into departamente values(ct_cod_departament.nextval,'MENTENANTA',180);
+insert into departamente values(ct_cod_departament.nextval,'SECURITATE',180);
+insert into departamente values(ct_cod_departament.nextval,'IT',160);
+insert into departamente values(ct_cod_departament.nextval,'BUCATARIE',160);
+insert into departamente values(ct_cod_departament.nextval,'APROVIZIONARE',160);
+insert into departamente values(ct_cod_departament.nextval,'DIVERTISMENT',100);
+select * from departamente;
+
+--ORASE
+insert into orase values(ct_cod_oras.nextval,'BUCURESTI',1830000);
+insert into orase values(ct_cod_oras.nextval,'CLUJ_NAPOCA',325000);
+insert into orase values(ct_cod_oras.nextval,'TIMISOARA',250000);
+insert into orase values(ct_cod_oras.nextval,'IASI',270000);
+insert into orase values(ct_cod_oras.nextval,'VASLUI',70000);
+insert into orase values(ct_cod_oras.nextval,'BRASOV',240000);
+insert into orase values(ct_cod_oras.nextval,'VATRA_DORNEI',20000);
+insert into orase values(ct_cod_oras.nextval,'CONSTANTA',265000);
+insert into orase values(ct_cod_oras.nextval,'MANGALIA',32000);
+insert into orase values(ct_cod_oras.nextval,'NAVODARI',35000);
+insert into orase values(ct_cod_oras.nextval,'EFORIE',10000);
+insert into orase values(ct_cod_oras.nextval,'CRAIOVA',235000);
+
+--HOTELURI
+insert into hoteluri values(ct_cod_hotel.nextval,1,'ROYAL_ORCHID',5,7,3.2);
+insert into hoteluri values(ct_cod_hotel.nextval,2,'ROYAL_ORCHID',5,7,3.2);
+insert into hoteluri values(ct_cod_hotel.nextval,3,'ROYAL_ORCHID',5,7,3.2);
+insert into hoteluri values(ct_cod_hotel.nextval,4,'ROYAL_ORCHID',5,7,3.2);
+insert into hoteluri values(ct_cod_hotel.nextval,8,'EMERALD_SHORES',4,5,2.8);
+insert into hoteluri values(ct_cod_hotel.nextval,9,'EMERALD_SHORES',4,5,2.8);
+insert into hoteluri values(ct_cod_hotel.nextval,11,'EMERALD_SHORES',4,5,2.8);
+insert into hoteluri values(ct_cod_hotel.nextval,8,'OCEAN_BREEZE',3,6,2.4);
+insert into hoteluri values(ct_cod_hotel.nextval,9,'OCEAN_BREEZE',3,6,2.4);
+insert into hoteluri values(ct_cod_hotel.nextval,10,'OCEAN_BREEZE',3,6,2.4);
+insert into hoteluri values(ct_cod_hotel.nextval,1,'BUSINESS_OASIS',5,6,3.2);
+insert into hoteluri values(ct_cod_hotel.nextval,2,'BUSINESS_OASIS',5,6,3.2);
+insert into hoteluri values(ct_cod_hotel.nextval,6,'EVEREST',3,6,2.4);
+insert into hoteluri values(ct_cod_hotel.nextval,7,'EVEREST',3,6,2.4);
+insert into hoteluri values(ct_cod_hotel.nextval,5,'ARRAKIS',3,4,2.4);
+
+--TIPURI_CAMERA
+insert into tipuri_camera values(ct_cod_tip_camera.nextval,'SINGLE',100,1);
+insert into tipuri_camera values(ct_cod_tip_camera.nextval,'DOUBLE',140,2);
+insert into tipuri_camera values(ct_cod_tip_camera.nextval,'TRIPLE',180,3);
+insert into tipuri_camera values(ct_cod_tip_camera.nextval,'GARSONIERA',250,2);
+insert into tipuri_camera values(ct_cod_tip_camera.nextval,'APARTAMENT',320,4);
+insert into tipuri_camera values(ct_cod_tip_camera.nextval,'PENTHOUSE',700,6);
+
+--FACILITATI
+insert into facilitati values(ct_cod_facilitate.nextval,500000,'PISCINA_INT');
+insert into facilitati values(ct_cod_facilitate.nextval,500000,'PISCINA_EXT');
+insert into facilitati values(ct_cod_facilitate.nextval,200000,'SPA');
+insert into facilitati values(ct_cod_facilitate.nextval,300000,'SALA_FITNESS');
+insert into facilitati values(ct_cod_facilitate.nextval,700000,'CINEMATOGRAF');
+insert into facilitati values(ct_cod_facilitate.nextval,600000,'RESTAURANT');
+insert into facilitati values(ct_cod_facilitate.nextval,200000,'SAUNA');
+insert into facilitati values(ct_cod_facilitate.nextval,1000000,'PARCARE');
+insert into facilitati values(ct_cod_facilitate.nextval,400000,'SALA_EVENIMENTE');
+
+--ABONAMENTE
+insert into abonamente values(ct_cod_abonament.nextval,0,'STANDARD');
+insert into abonamente values(ct_cod_abonament.nextval,100,'BRONZE');
+insert into abonamente values(ct_cod_abonament.nextval,150,'SILVER');
+insert into abonamente values(ct_cod_abonament.nextval,200,'GOLD');
+insert into abonamente values(ct_cod_abonament.nextval,250,'PLATINUM');
+insert into abonamente values(ct_cod_abonament.nextval,300,'DIAMOND');
+
+--FACILITATI_HOTELURI
+--parcari
+insert into facilitati_hoteluri values(1,8,2000,'00:00','23:59');
+insert into facilitati_hoteluri values(2,8,2000,'00:00','23:59');
+insert into facilitati_hoteluri values(3,8,2000,'00:00','23:59');
+insert into facilitati_hoteluri values(4,8,2000,'00:00','23:59');
+insert into facilitati_hoteluri values(11,8,2000,'00:00','23:59');
+insert into facilitati_hoteluri values(12,8,2000,'00:00','23:59');
+--retaurante
+insert into facilitati_hoteluri values(1,6,300,'09:00','22:00');
+insert into facilitati_hoteluri values(2,6,300,'09:00','22:00');
+insert into facilitati_hoteluri values(3,6,300,'09:00','22:00');
+insert into facilitati_hoteluri values(4,6,300,'09:00','22:00');
+insert into facilitati_hoteluri values(13,6,300,'09:00','22:00');
+insert into facilitati_hoteluri values(14,6,300,'09:00','22:00');
+insert into facilitati_hoteluri values(11,6,300,'09:00','22:00');
+--piscina_int
+insert into facilitati_hoteluri values(11,1,150,'10:00','22:00');
+insert into facilitati_hoteluri values(12,1,150,'10:00','22:00');
+--pisicina_ext
+insert into facilitati_hoteluri values(8,2,300,'08:00','20:00');
+insert into facilitati_hoteluri values(9,2,300,'08:00','20:00');
+insert into facilitati_hoteluri values(10,2,300,'08:00','20:00');
+insert into facilitati_hoteluri values(5,2,300,'08:00','20:00');
+insert into facilitati_hoteluri values(6,2,300,'08:00','20:00');
+insert into facilitati_hoteluri values(7,2,300,'08:00','20:00');
+--spa
+insert into facilitati_hoteluri values(1,3,50,'06:00','18:00');
+insert into facilitati_hoteluri values(2,3,50,'06:00','18:00');
+insert into facilitati_hoteluri values(3,3,50,'06:00','18:00');
+insert into facilitati_hoteluri values(4,3,50,'06:00','18:00');
+--sala_fitness
+insert into facilitati_hoteluri values(1,4,100,'06:00','20:00');
+insert into facilitati_hoteluri values(2,4,100,'06:00','20:00');
+insert into facilitati_hoteluri values(3,4,100,'06:00','20:00');
+insert into facilitati_hoteluri values(4,4,100,'06:00','20:00');
+--cinematograf
+insert into facilitati_hoteluri values(1,5,70,'13:00','00:00');
+
+--FACILITATI_ABONAMENTE
+--standard
+insert into facilitati_abonamente values(8,1,5);
+--bronze
+insert into facilitati_abonamente values(8,2,5);
+insert into facilitati_abonamente values(6,2,3);
+--silver
+insert into facilitati_abonamente values(8,3,5);
+insert into facilitati_abonamente values(6,3,3);
+insert into facilitati_abonamente values(1,3,1);
+insert into facilitati_abonamente values(2,3,1);
+--gold
+insert into facilitati_abonamente values(8,4,5);
+insert into facilitati_abonamente values(6,4,4);
+insert into facilitati_abonamente values(1,4,2);
+insert into facilitati_abonamente values(2,4,2);
+--platinum
+insert into facilitati_abonamente values(8,5,10);
+insert into facilitati_abonamente values(6,5,6);
+insert into facilitati_abonamente values(1,5,4);
+insert into facilitati_abonamente values(2,5,4);
+insert into facilitati_abonamente values(3,5,1);
+insert into facilitati_abonamente values(4,5,1);
+insert into facilitati_abonamente values(5,5,1);
+--diamond
+insert into facilitati_abonamente values(8,6,10);
+insert into facilitati_abonamente values(6,6,8);
+insert into facilitati_abonamente values(1,6,6);
+insert into facilitati_abonamente values(2,6,6);
+insert into facilitati_abonamente values(3,6,2);
+insert into facilitati_abonamente values(4,6,2);
+insert into facilitati_abonamente values(5,6,2);
+select * from angajati;
+
+--ANGAJATI
+insert into angajati values(ct_cod_angajat.nextval,1,1,'Popescu','Monica',3200,to_date('12-august-2014'));
+insert into angajati values(ct_cod_angajat.nextval,2,2,'Popa','Ilinca',2400,to_date('9-march-2019'));
+insert into angajati values(ct_cod_angajat.nextval,4,3,'Diaconu','Laurentiu',4200,to_date('2-january-2017'));
+insert into angajati values(ct_cod_angajat.nextval,5,4,'Chirila','Matei',3300,to_date('23-may-2013'));
+insert into angajati values(ct_cod_angajat.nextval,6,5,'Caliniuc','Gelu',3000,to_date('11-june-2018'));
+insert into angajati values(ct_cod_angajat.nextval,7,11,'Ungureanu','Darius',7000,to_date('14-december-2017'));
+insert into angajati values(ct_cod_angajat.nextval,8,6,'Bontea','Sorin',2400,to_date('3-november-2020'));
+insert into angajati values(ct_cod_angajat.nextval,9,7,'Popa','Cristian',3000,to_date('17-february-2019'));
+insert into angajati values(ct_cod_angajat.nextval,1,8,'Lungu','Florin',3200,to_date('4-october-2018'));
+insert into angajati values(ct_cod_angajat.nextval,2,9,'Grigorescu','Claudia',3000,to_date('1-april-2012'));
+insert into angajati values(ct_cod_angajat.nextval,4,10,'Sorescu','Bianca',4600,to_date('28-july-2020'));
+insert into angajati values(ct_cod_angajat.nextval,5,12,'Liteanu','Sergiu',3100,to_date('8-september-2016'));
+insert into angajati values(ct_cod_angajat.nextval,6,13,'Obreja','Catalin',3500,to_date('16-august-2017'));
+insert into angajati values(ct_cod_angajat.nextval,7,1,'Bejenaru','Ioana',6500,to_date('6-november-2018'));
+insert into angajati values(ct_cod_angajat.nextval,8,14,'Dumitru','Carmen',3800,to_date('20-january-2017'));
+insert into angajati values(ct_cod_angajat.nextval,9,2,'Constantinescu','Bogdan',2700,to_date('27-april-2017'));
+insert into angajati values(ct_cod_angajat.nextval,1,3,'Dobrescu','Roxana',2500,to_date('5-october-2016'));
+insert into angajati values(ct_cod_angajat.nextval,2,4,'Miculescu','Georgiana',2400,to_date('22-june-2020'));
+insert into angajati values(ct_cod_angajat.nextval,4,5,'Constandache','Alexia',4000,to_date('5-july-2019'));
+insert into angajati values(ct_cod_angajat.nextval,5,6,'Acatrinei','Horia',3200,to_date('14-march-2021'));
+insert into angajati values(ct_cod_angajat.nextval,6,7,'Mircea','Petrisor',3700,to_date('7-february-2021'));
+insert into angajati values(ct_cod_angajat.nextval,7,8,'Mircea','Dragos',5500,to_date('5-may-2017'));
+insert into angajati values(ct_cod_angajat.nextval,8,9,'Ouatu','Lidia',4200,to_date('22-june-2022'));
+insert into angajati values(ct_cod_angajat.nextval,9,10,'Lefter','Razvan',2900,to_date('10-december-2019'));
+insert into angajati values(ct_cod_angajat.nextval,1,11,'Olaru','Denisa',3100,to_date('9-july-2018'));
+insert into angajati values(ct_cod_angajat.nextval,2,12,'Ciurescu','Crina',2600,to_date('1-march-2017'));
+insert into angajati values(ct_cod_angajat.nextval,4,13,'Ungureanu','Olimpia',3700,to_date('16-august-2019'));
+insert into angajati values(ct_cod_angajat.nextval,6,14,'Chiratcu','Andrei',3000,to_date('17-april-2022'));
+
+
+--CAMERE
+insert into camere values(ct_cod_camera_hotel_1.nextval,1,2,1);
+insert into camere values(ct_cod_camera_hotel_1.nextval,1,6,7);
+insert into camere values(ct_cod_camera_hotel_1.nextval,1,3,2);
+insert into camere values(ct_cod_camera_hotel_1.nextval,1,2,1);
+insert into camere values(ct_cod_camera_hotel_2.nextval,2,2,2);
+insert into camere values(ct_cod_camera_hotel_2.nextval,2,1,1);
+insert into camere values(ct_cod_camera_hotel_3.nextval,3,5,6);
+insert into camere values(ct_cod_camera_hotel_3.nextval,3,6,7);
+insert into camere values(ct_cod_camera_hotel_4.nextval,4,2,3);
+insert into camere values(ct_cod_camera_hotel_4.nextval,4,6,7);
+insert into camere values(ct_cod_camera_hotel_5.nextval,5,2,2);
+insert into camere values(ct_cod_camera_hotel_5.nextval,5,2,3);
+insert into camere values(ct_cod_camera_hotel_6.nextval,6,2,2);
+insert into camere values(ct_cod_camera_hotel_6.nextval,6,5,5);
+insert into camere values(ct_cod_camera_hotel_7.nextval,7,2,2);
+insert into camere values(ct_cod_camera_hotel_7.nextval,7,3,3);
+insert into camere values(ct_cod_camera_hotel_8.nextval,8,2,1);
+insert into camere values(ct_cod_camera_hotel_8.nextval,8,2,2);
+insert into camere values(ct_cod_camera_hotel_9.nextval,9,1,1);
+insert into camere values(ct_cod_camera_hotel_9.nextval,9,2,2);
+insert into camere values(ct_cod_camera_hotel_10.nextval,10,2,2);
+insert into camere values(ct_cod_camera_hotel_10.nextval,10,3,2);
+insert into camere values(ct_cod_camera_hotel_11.nextval,11,6,6);
+insert into camere values(ct_cod_camera_hotel_11.nextval,11,6,6);
+insert into camere values(ct_cod_camera_hotel_12.nextval,12,5,5);
+insert into camere values(ct_cod_camera_hotel_12.nextval,12,6,6);
+insert into camere values(ct_cod_camera_hotel_13.nextval,13,2,2);
+insert into camere values(ct_cod_camera_hotel_13.nextval,13,2,4);
+insert into camere values(ct_cod_camera_hotel_14.nextval,14,2,2);
+insert into camere values(ct_cod_camera_hotel_14.nextval,14,3,4);
+
+--CLIENTI
+insert into clienti values(ct_cod_client.nextval,1,'Ionescu','Maria',to_date('11-may-1998'),'0741123456');
+insert into clienti values(ct_cod_client.nextval,2,'Vasilescu','Alexandru',to_date('8-june-1990'),'0722654321');
+insert into clienti values(ct_cod_client.nextval,3,'Popa','Elena',to_date('28-november-1993'),'0765987654');
+insert into clienti values(ct_cod_client.nextval,4,'Teodorescu','Raluca',to_date('6-august-1987'),'0733456789');
+insert into clienti values(ct_cod_client.nextval,5,'Dumitrescu','Ana',to_date('13-april-2003'),'0788321654');
+insert into clienti values(ct_cod_client.nextval,6,'Marin','Andrei',to_date('10-september-2000'),'0799112233');
+insert into clienti values(ct_cod_client.nextval,1,'Georgescu','Cristina',to_date('14-june-1997'),'0744556677');
+insert into clienti values(ct_cod_client.nextval,2,'Iliescu','Gabriel',to_date('22-february-1991'),'0712345678');
+insert into clienti values(ct_cod_client.nextval,3,'Preda','Ioana',to_date('9-august-2001'),'0755123789');
+insert into clienti values(ct_cod_client.nextval,4,'Mihailescu','Radu',to_date('3-october-1998'),'0766987123');
+insert into clienti values(ct_cod_client.nextval,5,'Paunescu','Laura',to_date('11-july-1996'),'0723654987');
+insert into clienti values(ct_cod_client.nextval,6,'Rusu','Vasile',to_date('4-december-1993'),'0745123789');
+insert into clienti values(ct_cod_client.nextval,1,'Florescu','Diana',to_date('7-january-1992'),'0734456123');
+insert into clienti values(ct_cod_client.nextval,2,'Enache','George',to_date('2-march-1978'),'0789321456');
+insert into clienti values(ct_cod_client.nextval,3,'Anghel','Carmen',to_date('27-june-1977'),'0764777888');
+insert into clienti values(ct_cod_client.nextval,2,'Dumitru','Daniela',to_date('15-september-1992'),'0743111222');
+insert into clienti values(ct_cod_client.nextval,3,'Teodor','Carmen',to_date('27-june-1977'),'0798654321');
+insert into clienti values(ct_cod_client.nextval,3,'Sandu','Florin',to_date('14-july-1981'),'0721333444');
+
+--TRANZACTII
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CASH',NULL,1344);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BCR',672);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BT',1680);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CASH',NULL,2352);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','ING',8960);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BT',2240);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CASH',NULL,2160);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BRD',2592);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BRD',4480);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CASH',NULL,2352);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BT',17920);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BCR',8960);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CASH',NULL,6144);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','ING',2352);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BT',2688);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BT',1960);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CASH',NULL,2016);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BT',2744);
+insert into tranzactii values(ct_cod_tranzactie.nextval,'CARD','BT',2240);
+
+--REZERVARI
+insert into rezervari values(1,8,1,1,to_date('18-june-2024'),to_date('22-june-2024'));
+insert into rezervari values(1,13,2,2,to_date('1-july-2024'),to_date('3-july-2024'));
+insert into rezervari values(2,9,3,3,to_date('24-august-2024'),to_date('29-august-2024'));
+insert into rezervari values(1,5,4,4,to_date('15-june-2023'),to_date('21-june-2023'));
+insert into rezervari values(2,1,5,5,to_date('22-june-2024'),to_date('26-june-2024'));
+insert into rezervari values(1,2,6,6,to_date('8-august-2024'),to_date('13-august-2024'));
+insert into rezervari values(2,14,7,7,to_date('16-february-2025'),to_date('21-february-2025'));
+insert into rezervari values(2,10,8,8,to_date('21-june-2024'),to_date('27-june-2024'));
+insert into rezervari values(2,6,9,9,to_date('5-september-2024'),to_date('10-september-2024'));
+insert into rezervari values(1,7,10,10,to_date('2-september-2024'),to_date('8-september-2024'));
+insert into rezervari values(2,12,11,11,to_date('10-november-2024'),to_date('18-november-2024'));
+insert into rezervari values(1,11,12,12,to_date('13-march-2024'),to_date('17-march-2024'));
+insert into rezervari values(1,3,13,13,to_date('18-july-2024'),to_date('24-july-2024'));
+insert into rezervari values(1,8,14,14,to_date('16-july-2024'),to_date('23-july-2024'));
+insert into rezervari values(1,4,15,15,to_date('23-december-2023'),to_date('29-december-2023'));
+insert into rezervari values(1,10,17,17,to_date('22-june-2024'),to_date('28-june-2024'));
+insert into rezervari values(1,6,18,18,to_date('3-july-2024'),to_date('10-july-2024'));
+insert into rezervari values(1,2,6,19,to_date('15-september-2023'),to_date('20-september-2023'));
+insert into rezervari values(1,2,16,16,to_date('1-january-2023'),to_date('6-january-2023'));

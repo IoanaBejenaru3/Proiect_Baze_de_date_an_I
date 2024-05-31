@@ -1,0 +1,208 @@
+--EXERCITII PE BAZA TABELELOR SI PE BAZA SGDB-ULUI
+
+--CERINTA 12
+
+--Afișați codul și denumirea (cu prima literă mare și restul mici) abonamentelor care au fost 
+--cel mai folosite de clienți în rezervările încheiate 
+--(care nu sunt în desfășurare sau care nu urmează).
+
+--pasul 1:construiesc o tabela in care am doar rezervarile incheiate
+with aux as(select c.cod_abonament
+            from rezervari r, clienti c
+            where r.cod_client = c.cod_client and
+            r.data_plecare < sysdate),
+--pasul 2:construiesct o alta tabela in care am codul abonamentelor si numarul lor total
+aux_2 as(select count(*) as numar_abonamente, cod_abonament
+         from aux
+         group by cod_abonament)
+--pasul 3: trebuie sa afisez toate abonamentele care sunt maxime
+select aa.cod_abonament, initcap(a.denumire)
+from aux_2 aa, abonamente a
+where aa.cod_abonament = a.cod_abonament and
+aa.numar_abonamente = (select max(numar_abonamente)
+                       from aux_2);
+
+
+--Pentru acele camere care au fost rezervate de mai multe ori decât minimul rezervărilor unei camere,
+--să se afișeze codul și denumirea hotelului, codul și denumirea camerei și numărul de rezervari făcute pe respectiva cameră.
+--Camerele nu trebuie să aparțină aceluiași hotel pentru a li se compara rezervările. Rezultatele vor fi ordonate dupa
+--numarul de rezevari
+
+--Pas 1: fac o tabela care contine informatii pe care vreau sa le afisez
+with aux as(
+select h.cod_hotel, h.denumire as denumire_hotel, c.cod_camera, tc.denumire as denumire_camera
+from hoteluri h, camere c, tipuri_camera tc
+where h.cod_hotel = c.cod_hotel and
+c.cod_tip_camera = tc.cod_tip_camera)
+--Pas 2: aflu numarul de rezervari pentru fiecare camera
+select a.cod_hotel, a.denumire_hotel, a.cod_camera, a.denumire_camera, numar
+from aux a, (select count(*) numar, cod_camera as cm, cod_hotel as ch
+                           from rezervari
+                           group by cod_camera, cod_hotel
+                           having count(*) > (select min(count(*))
+                                               from rezervari
+                                               group by cod_camera, cod_hotel)) aux_2
+where a.cod_hotel = ch and a.cod_camera = cm
+order by numar;
+
+--Să se afișeze următoarele informații referitoare la rezervări: codul camerei, codul hotelului, codul clientului,
+--data venirii clientului și cea a plecării, suma plătită pentru rezervare,
+--banca prin care a fost efectuată tranzacția pentru rezervare 
+--(în cazul în care tranzacția a fost efectuată cash se va afișa mesajul “Nicio bancă - CASH”)
+--și tipul rezervării (“ÎNCHEIATĂ”, “ÎN DESFĂȘURARE”, “VIITOARE”). Rezultatele vor fi ordonate după tipul rezervării.
+
+select cod_camera, cod_hotel, cod_client, data_venire, data_plecare, suma, 
+decode(nvl(banca,'null'),'null','Nicio banca - cash','Tranzactie prin ' || banca) as banca,
+case
+    when data_venire <= sysdate and sysdate < data_plecare then 'IN DESFASURARE'
+    when data_plecare < sysdate then 'INCHEIATA'
+    else 'VIITOARE'
+end as tip_rezervare
+from rezervari r, tranzactii t
+where r.cod_tranzactie = t.cod_tranzactie
+order by tip_rezervare;
+
+--Pentru fiecare client să se afișeze suma totală pe care a cheltuit-o
+--pe rezervări în cadrul tuturor hotelurilor antreprenorului.
+
+select nume, prenume,(select sum(suma)
+                      from tranzactii t, rezervari r
+                      where c.cod_client = r.cod_client and r.cod_tranzactie = t.cod_tranzactie) as suma_totala
+from clienti c 
+order by 1,2;
+
+
+--Să se afișeze numele și prenumele (cu majuscule și într-o singură coloană denumită ‘nume_complet’) 
+--clienților care au fost sau vor fi cazați măcar o dată la un hotel de 4 sau 5 stele până
+--la terminarea anului 2024. Clienții trebuie să aibă și un abonament de tip 5 sau 6. 
+with hoteluri_stele as(select cod_hotel, denumire, numar_stele
+                    from hoteluri
+                    where numar_stele = 4 or numar_stele = 5)
+select distinct concat(concat(upper(nume),' '),upper(prenume)) as nume_complet
+from clienti c, rezervari r
+where c.cod_client = r.cod_client and (c.cod_abonament = 5 or c.cod_abonament = 6) and
+data_venire < to_date('31-december-2024')
+and exists (select 1
+            from hoteluri_stele
+            where cod_hotel = r.cod_hotel);
+
+
+--CERINTA 13   
+
+--Să se mărească salariile tuturor angajaților care au peste 8 ani vechime cu 1.2.  
+update angajati
+set salariu = salariu * 1.2
+where cod_angajat in (select a.cod_angajat
+                      from angajati a
+                      where to_number(to_char(sysdate,'yyyy'))
+                      - to_number(to_char(data_angajare,'yyyy')) >= 8);
+                      
+commit;
+
+insert into orase values(ct_cod_oras.nextval,'CRAIOVA',242000);
+insert into orase values(ct_cod_oras.nextval,'GALATI',218000);
+
+--Să se șteargă din tabela ORASE toate orașele în care antreprenorul nu are niciun hotel.
+delete 
+from orase
+where cod_oras not in(select distinct h.cod_oras
+                      from hoteluri h);
+--Să se mărească cu 10% salarile tuturor angajaților care au salariul mai mic 
+--decât media tuturor salariilor din cadrul departamentului din care fac parte (se ține cont doar de departament nu și de hotelul din care fac parte)         
+update angajati 
+set salariu = salariu + 0.1 * salariu
+where salariu < (select avg(a.salariu)
+                 from angajati a
+                 where a.cod_departament = cod_departament);
+
+
+--CERINTA 14
+
+--Să se creeze o vizualizare care conține date despre toți angajații
+-- referitoare la numele și prenumele acestora, departamentul din care fac parte, vechimea lor și cât fac aceștia pe oră.
+create view vizualizare_angajati as(select nume, prenume, salariu, denumire,
+to_number(to_char(sysdate,'YYYY')) - to_number(to_char(data_angajare,'YYYY')) as vechime,
+round(salariu / ore_pe_luna) as suma_pe_ora
+from angajati a, departamente d
+where a.cod_departament = d.cod_departament);
+
+drop view vizualizare_angajati;
+
+select *
+from vizualizare_angajati;
+
+--Să se mărească cu 5% salariul tuturor angajaților care primesc între 15 și 18 lei pe oră (inclusiv).
+update vizualizare_angajati
+set salariu = salariu * 0.05
+where 15 <= suma_pe_ora and suma_pe_ora <= 18;
+
+insert into vizualizare_angajati values('Grigorescu','Emilia',4500,'MARKETING',0,38);
+
+
+--CERINTA 15
+
+--OUTERJOIN
+
+--Să se afișeze denumirile orașelor, denumirile hotelurilor, numele și prenumele angajaților și denumirile departamentelor 
+--inclusiv pentru orașele în care nu sunt hoteluri, pentru hotelurile în care nu lucrează niciun
+-- angajat și pentru departamentele în care nu lucrează niciun angajat.
+
+select o.denumire as denumire_oras, h.denumire as denumire_hotel, a.cod_angajat, a.nume, a.prenume, d.denumire as denumire_departament
+from orase o 
+left outer join hoteluri h on h.cod_oras = o.cod_oras
+left outer join angajati a on h.cod_hotel = a.cod_hotel
+full outer join departamente d on a.cod_departament = d.cod_departament;
+
+--DIVIZION
+
+--Să se afișeze facilitățile care sunt incluse doar în aceleași abonamente ca și facilitatea cu codul egal cu 2. (se folosește metoda de division cu A include B <-> B - A = mulțimea vidă)
+--Cerința spune că trebuie afișate doar acele facilități care sunt incluse exclusiv în abonamentele în care apare facilitatea cu codul 2. Astfel, trebuie verificat ca o anumită facilitate să nu fie cumva inclusă în mai puține abonamente, dar nici în mai multe. Aici intervine dubla incluziune: A - B = B - A = mulțimea vidă -> mulțimile sunt egale.
+
+
+--cu multimi
+with aux as(select cod_abonament
+            from facilitati_abonamente
+            where cod_facilitate = 2) 
+select cod_facilitate, denumire
+from facilitati f
+where not exists(select *
+                 from aux
+                 minus
+                 select cod_abonament
+                 from facilitati_abonamente
+                 where f.cod_facilitate = cod_facilitate)
+and not exists(select cod_abonament
+               from facilitati_abonamente
+               where f.cod_facilitate = cod_facilitate
+               minus
+               select *
+               from aux);
+
+--cu count
+ 
+--Să se afișeze toate facilitățile care sunt incluse în toate abonamentele 
+--existente în cadrul hotelurilor. (exemplu mai simplu care folosește metoda de division cu count)
+select cod_facilitate, denumire
+from facilitati
+where cod_facilitate in (select cod_facilitate
+                         from facilitati_abonamente
+                         group by cod_facilitate
+                         having count(*) = (select count(cod_abonament) from abonamente));
+                       
+--ANALIZA TOP-N
+
+--Să se afișeze hotelurile care au adus primele 3 cele mai mari sume antreprenorului. 
+with aux as(
+select h.cod_hotel, h.denumire, suma_totala
+from hoteluri h, (select sum(suma) as suma_totala, r.cod_hotel as cd
+                  from rezervari r, tranzactii t
+                  where r.cod_tranzactie = t.cod_tranzactie
+                  group by r.cod_hotel) 
+where cd = h.cod_hotel)
+select cod_hotel, denumire, suma_totala
+from aux
+where suma_totala in (select suma_totala
+                      from (select distinct a.suma_totala
+                            from aux a
+                            order by 1 desc)
+                       where rownum < 4);
